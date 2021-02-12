@@ -45,6 +45,7 @@ from .dataset.dataset import load_table, dump_table_to_num
 from .dataset.gen_dataset import generate_dataset
 from .dataset.manipulate_dataset import gen_appended_dataset
 from .estimator.sample import test_sample
+from .estimator.sample_reservoir import test_sample_reservoir
 from .estimator.postgres import test_postgres
 from .estimator.mysql import test_mysql
 from .estimator.mhist import test_mhist
@@ -176,6 +177,8 @@ if __name__ == "__main__":
 
         if args["--estimator"] == "sample":
             test_sample(seed, dataset, version, workload, params, overwrite)
+        elif args["--estimator"] == "sample-reservoir":
+            test_sample_reservoir(seed, dataset, version, workload, params, overwrite)
         elif args["--estimator"] == "postgres":
             test_postgres(seed, dataset, version, workload, params, overwrite)
         elif args["--estimator"] == "mysql":

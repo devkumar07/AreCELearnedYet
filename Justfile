@@ -339,6 +339,10 @@ test-sample dataset='census13' version='original' workload='base' ratio='0.015' 
     poetry run python -m lecarb test -s{{seed}} -d{{dataset}} -v{{version}} -w{{workload}} -esample --params \
         "{'version': '{{train_version}}', 'ratio': {{ratio}}}"
 
+test-sample-reservoir dataset='census13' version='original' workload='base' ratio='0.015' train_version='original' seed='123':
+    poetry run python -m lecarb test -s{{seed}} -d{{dataset}} -v{{version}} -w{{workload}} -esample-reservoir --params \
+        "{'version': '{{train_version}}', 'ratio': {{ratio}}}"
+
 test-mhist dataset='census13' version='original' workload='base' num_bins='30000' train_version='original' seed='123':
     poetry run python -m lecarb test -s{{seed}} -d{{dataset}} -v{{version}} -w{{workload}} -emhist --params \
         "{'version': '{{train_version}}', 'num_bins': {{num_bins}}}"
