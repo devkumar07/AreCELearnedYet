@@ -17,7 +17,8 @@ L = logging.getLogger(__name__)
 class Sampling(Estimator):
     def __init__(self, table, ratio, seed):
         super(Sampling, self).__init__(table=table, version=table.version, ratio=ratio, seed=seed)
-        k = 10000 #reservoir size
+        k = int(input('Reservoir size: '))
+        #k = 10000 #reservoir size
         n = len(table.data) #dataset size
         data = table.data
 
@@ -38,8 +39,8 @@ class Sampling(Estimator):
                 W = W * math.exp(math.log(random.random())/k)
 
         self.sample = Sample
-        print('AFTER------------------')
-        print(self.sample)
+        #print('AFTER------------------')
+        #print(self.sample)
         self.sample_num = len(self.sample)
 
     def query(self, query):
@@ -60,7 +61,6 @@ def test_sample_reservoir(seed: int, dataset: str, version: str, workload: str, 
     """
     # prioriy: params['version'] (draw sample from another dataset) > version (draw and test on the same dataset)
     table = load_table(dataset, params.get('version') or version)
-    print('GOES HERE')
     L.info("construct reservoir sampling estimator...")
     estimator = Sampling(table, ratio=params['ratio'] or 0.01, seed=seed)
     L.info(f"built reservoir sampling estimator: {estimator}")
