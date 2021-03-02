@@ -11,36 +11,43 @@ from ..dataset.dataset import load_table
 import random
 from random import randrange
 import math
+import time
+from pandas.util.testing import assert_frame_equal
 
 L = logging.getLogger(__name__)
 
 class Sampling(Estimator):
-    def __init__(self, table, ratio, seed):
+    def __init__(self, table, ratio, seed, size):
         super(Sampling, self).__init__(table=table, version=table.version, ratio=ratio, seed=seed)
-        k = int(input('Reservoir size: '))
+        k = size#int(input('Reservoir size: '))
         #k = 10000 #reservoir size
         n = len(table.data) #dataset size
         data = table.data
+        data_vec = data.to_numpy()
 
         #Initialize reservoir
+        start_time = time.time()
         Sample = pd.DataFrame(data = data.iloc[0:k],columns=data.columns)
+        Sample_vec = Sample.to_numpy()
         
         #Setting value of W
-        W = math.exp(math.log(random.random()/k))
+        W = math.exp(math.log10(random.random()/k))
         
         #print(Sample)
         
         S = k+1
         
         while S <= n:
-            S = S + math.floor(math.log(random.random())/math.log(1-W)) + 1
+            S = S + math.floor(math.log10(random.random())/math.log10(1-W)) + 1
             if S <= n:
-                Sample.loc[randrange(k)] = data.iloc[S]  
-                W = W * math.exp(math.log(random.random())/k)
-
-        self.sample = Sample
+                Sample_vec[randrange(k)] = data_vec[S]
+                W = W * math.exp(math.log10(random.random())/k)
+        result = pd.DataFrame(Sample_vec, columns = data.columns)
+        self.sample = result
+        print('EXECUTION TIME: ',time.time() - start_time)
         #print('AFTER------------------')
         #print(self.sample)
+        #print(Sample.equals(Sample_vec))
         self.sample_num = len(self.sample)
 
     def query(self, query):
@@ -61,8 +68,9 @@ def test_sample_reservoir(seed: int, dataset: str, version: str, workload: str, 
     """
     # prioriy: params['version'] (draw sample from another dataset) > version (draw and test on the same dataset)
     table = load_table(dataset, params.get('version') or version)
+    s = int(input('Reservoir size: '))
     L.info("construct reservoir sampling estimator...")
-    estimator = Sampling(table, ratio=params['ratio'] or 0.01, seed=seed)
+    estimator = Sampling(table, ratio=params['ratio'] or 0.01, seed=seed, size = s)
     L.info(f"built reservoir sampling estimator: {estimator}")
 
     run_test(dataset, version, workload, estimator, overwrite)
