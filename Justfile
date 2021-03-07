@@ -347,6 +347,10 @@ test-mhist dataset='census13' version='original' workload='base' num_bins='30000
     poetry run python -m lecarb test -s{{seed}} -d{{dataset}} -v{{version}} -w{{workload}} -emhist --params \
         "{'version': '{{train_version}}', 'num_bins': {{num_bins}}}"
 
+test-single-histogram dataset='census13' version='original' workload='base' num_bins='30000' train_version='original' seed='123':
+    poetry run python -m lecarb test -s{{seed}} -d{{dataset}} -v{{version}} -w{{workload}} -esingle-histogram --params \
+        "{'version': '{{train_version}}', 'num_bins': {{num_bins}}}"
+
 test-bayesnet dataset='census13' version='original' workload='base' samples='200' discretize='100' parallelism='50' train_version='original' seed='123':
     poetry run python -m lecarb test -s{{seed}} -d{{dataset}} -v{{version}} -w{{workload}} -ebayesnet --params \
         "{'version': '{{train_version}}', 'samples': {{samples}}, 'discretize': {{discretize}}, 'parallelism': {{parallelism}}}"

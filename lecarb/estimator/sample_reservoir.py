@@ -12,7 +12,6 @@ import random
 from random import randrange
 import math
 import time
-from pandas.util.testing import assert_frame_equal
 
 L = logging.getLogger(__name__)
 
