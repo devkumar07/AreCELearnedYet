@@ -385,6 +385,7 @@ def construct_maxdiff(table, num_bins):
             distinct_val = np.unique(values)
             meta = [start,finish,'True',freq,len(distinct_val)] 
             bins.append(meta)
+        #TODO: Figure out how to call the partition class on this
         partition = Partition()
         partition.meta = bins
         #partition.calculate_spread_density()
