@@ -111,7 +111,6 @@ class Partition(object):
         #  L.error(self)
 
     def query(self, columns, operators, values):
-        #print('in query1')
         def get_points_on_left(v, closed=False):
             if v < left or (v == left and (not closed)):
                 return 0
@@ -279,11 +278,7 @@ class MHist(Estimator):
             est.card[tid] += self.partitions[candidate_pids[i]].query(columns, operators, values)
 
     def query(self, query):
-        #print('in query')
         columns, operators, values = query_2_triple(query, with_none=False, split_range=False)
-        print(columns)
-        print(operators)
-        print(values)
         # descritize predicate parameters for non-numerical columns
         for i, predicate in enumerate(zip(columns, operators, values)):
             cname, op, val = predicate
@@ -350,41 +345,52 @@ def print_partitions(partitions):
 
 def construct_maxdiff(table, num_bins):
     partitions = []
-
+    data = table.data
+    ## Converting categorical values to numerical
+    for i in range(0, len(data.dtypes)):
+        if data.dtypes[i].name == 'category':
+            data[data.columns[i]] = data[data.columns[i]].cat.codes
+    
+    #data_sorted = data.sort_values(by=list(data.columns),axis=0, ascending = True)
+    data_sorted = data.copy()
+    for col in data_sorted:
+        data_sorted[col] = data_sorted[col].sort_values(ignore_index=True)
+    data_sorted_numpy = data_sorted.to_numpy()
+    print(data_sorted_numpy)
+    average_freq = len(data_sorted_numpy)/num_bins
+    
     start_stmp = time.time()
-    for i in range(num_bins):
-        if len(partitions) == 0:
-            partitions.append(Partition())
-            partitions[0].construct_from_table(table)
-            continue
-
-        # find the partition has maxdiff to split
-        maxdiff = 0
-        pid = None
-        for i, p in enumerate(partitions):
-            p_md = p.get_maxdiff()
-            if p_md > maxdiff:
-                maxdiff = p_md
-                pid = i
-
-        #  print_partitions(partitions)
-        if maxdiff == 0:
-            L.info('Maxdiff is 0 before reach partition limit!')
-            break
-
-        p = partitions.pop(pid)
-        p1, p2 = p.split_partition()
-        partitions.extend([p1, p2])
-
-        if (i+1) % 100 == 0:
-            L.info(f'Constructed {i+1} partitions!')
-
-    for p in partitions:
-        p.calculate_spread_density()
-        p.clean()
+    
+    #Create 1-D hist for each attribute
+    for i in range(0,len(data_sorted.columns)):
+        k = 1
+        print('FOR: ',data_sorted.columns[i])
+        #Iterate over num_bins
+        bins = []
+        for x in range(num_bins): 
+            start = data_sorted_numpy[k][i]
+            freq = 1
+            values = []
+            values.append(data_sorted_numpy[k][i])
+            while k % int(average_freq) != 0:
+                values.append(data_sorted_numpy[k][i])
+                k = k + 1
+                freq = freq + 1
+            values.append(data_sorted_numpy[k][i])
+            finish = data_sorted_numpy[k][i]
+            k = k + 1
+            freq = freq + 1
+            distinct_val = np.unique(values)
+            meta = [start,finish,'True',freq,len(distinct_val)] 
+            print(meta)
+            bins.append(meta)
+        #TODO: Figure out how to call the partition class on this
+        partition = Partition()
+        partition.meta = bins
+        #partition.calculate_spread_density()
+        #print_partitions(partition)
+        
     hist_size = get_hist_size(len(partitions), len(table.columns))
-    #  print_partitions(partitions)
-
     dur_min = (time.time() - start_stmp) / 60
     L.info(f'Construct MaxDiff Hist (MHIST-2) finished, use {len(partitions)} partitions ({hist_size:.2f}MB)! Time spent since start: {dur_min:.2f} mins')
 
@@ -411,7 +417,7 @@ def load_mhist(dataset: str, model_name: str) -> Tuple[Estimator, Dict[str, Any]
     estimator = MHist(partitions, table)
     return estimator, state
 
-def test_mhist(seed: int, dataset: str, version: str, workload: str, params: Dict[str, Any], overwrite: bool) -> None:
+def test_single_hist(seed: int, dataset: str, version: str, workload: str, params: Dict[str, Any], overwrite: bool) -> None:
     """
     params:
         version: the version of table that the histogram is built from, might not be the same with the one we test on
