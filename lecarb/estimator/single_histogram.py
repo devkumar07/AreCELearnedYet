@@ -19,40 +19,63 @@ from sklearn.preprocessing import LabelEncoder
 L = logging.getLogger(__name__)
 
 class SHist(Estimator):
-    def __init__(self, bins, encoder_map, table):
+    def __init__(self, bins, encoder_map, table, categorical_variables):
         super(SHist, self).__init__(table=table, bins=len(bins))
         self.bins = bins
         self.encoder_map = encoder_map
+        self.categorical_variables = categorical_variables
 
+    #TODO: Verify encoding using inverse_transform and finish logic for various conditions
     def query(self, query):
-        #print('in query')
+        print('in query')
+        histograms = self.bins
+        categorical_variables = self.categorical_variables
+        encoder_map = self.encoder_map
         columns, operators, values = query_2_triple(query, with_none=False, split_range=False)
         print(columns)
         print(operators)
         print(values)
         est_card = []
-        for pid in candidate_pids:
-            est_card.append(self.partitions[pid].query(columns, operators, values))
+        #Step 1: Encode categorical to numerical from query statement
+        for i in range (0, len(columns)):
+            if columns[i] in categorical_variables:
+                encoder = encoder_map[columns[i]]
+                #TODO: Verify encoded values. Idea: apply inverse transform to the output and then check.
+                val = []
+                val.append(values[i])
+                print(val)
+                ans = encoder.fit_transform(val)
+                print(ans)
+                values[i] = ans[0]
+                val = []
+        print('Encoded values:')
+        print(values)
+        
+        #Step 2: For each column involved, get the value
+        for i in range(0, len(columns)):
+             #Step 3: Iterate over bins to check how many bins satisfy the condition
+            if operators == '=':
+                bins = histograms[columns[i]]
+                counter = 0 
+                for k in range(0,len(bins)):
+                    bin = bins[k]
+                    if bin[0] == values[0]
 
-        dur_ms = (time.time() - start_stmp) * 1e3
 
-        #  return np.round(est.card.sum()), dur_ms
-        return np.round(np.sum(est_card)), dur_ms
         
 def construct_bins(table, num_bins):
     partitions = []
     data = table.data
     ## Converting categorical values to numerical
     encoder_map = {}
+    categorical_variables = []
     for i in range(0, len(data.dtypes)):
         if data.dtypes[i].name == 'category':
+            categorical_variables.append(data.columns[i])
             encoder = LabelEncoder()
             data[data.columns[i]] = encoder.fit_transform(data[data.columns[i]])
             encoder_map[data.columns[i]] = encoder
     print(encoder_map)
-    #data['workclass'] = encoder_map['workclass'].inverse_transform(data['workclass'])
-    #print(data)
-    #data_sorted = data.sort_values(by=list(data.columns),axis=0, ascending = True)
     data_sorted = data.copy()
     for col in data_sorted:
         data_sorted[col] = data_sorted[col].sort_values(ignore_index=True)
@@ -85,7 +108,7 @@ def construct_bins(table, num_bins):
             bins.append(meta)
         partitions.append(bins)
     
-    return partitions, encoder_map
+    return partitions, encoder_map, categorical_variables
 
 def test_single_hist(seed: int, dataset: str, version: str, workload: str, params: Dict[str, Any], overwrite: bool) -> None:
     """
@@ -106,13 +129,13 @@ def test_single_hist(seed: int, dataset: str, version: str, workload: str, param
             state = pickle.load(f)
     else:
         L.info(f"Construct SHist with at most {params['num_bins']} bins...")
-        state, encoder = construct_bins(table, params['num_bins'])
+        state, encoder, categorical_variables = construct_bins(table, params['num_bins'])
         with open(model_file, 'wb') as f:
             pickle.dump(state, f, protocol=PKL_PROTO)
         L.info(f"MHist saved to {model_file}")
 
     # partitions = attribute_bins
-    estimator = SHist(state, encoder, table)
+    estimator = SHist(state, encoder, table, categorical_variables)
     L.info(f"Built SHist estimator: {estimator}")
 
     run_test(dataset, version, workload, estimator, overwrite)
