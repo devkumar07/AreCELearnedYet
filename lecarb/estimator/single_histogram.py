@@ -26,7 +26,7 @@ class SHist(Estimator):
         self.categorical_variables = categorical_variables
 
     #TODO: Finish logic for performing cardinality estimation
-    
+
     def query(self, query):
         print('in query')
         histograms = self.bins
@@ -51,17 +51,18 @@ class SHist(Estimator):
         print('Encoded values:')
         print(values)
         
-        #Step 2: For each column involved, get the value
+        #Iterate over all conditions
         for i in range(0, len(columns)):
-             #Step 3: Iterate over bins to check how many bins satisfy the condition
+            #Check for specific condition corresponding to the operator
             if operators == '=':
                 bins = histograms[columns[i]]
-                counter = 0 
                 for k in range(0,len(bins)):
                     bin = bins[k]
-                    if bin[0] == values[0]
-
-        return 0,10
+                    if values[i] >= bin[0] and bin[1] >= values[i]:
+                        est_card.append(bin[3]/bin[4])
+                        break
+            
+        return np.sum(est_card),10
 
 
 
