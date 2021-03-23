@@ -25,7 +25,8 @@ class SHist(Estimator):
         self.encoder_map = encoder_map
         self.categorical_variables = categorical_variables
 
-    #TODO: Verify encoding using inverse_transform and finish logic for various conditions
+    #TODO: Finish logic for performing cardinality estimation
+    
     def query(self, query):
         print('in query')
         histograms = self.bins
@@ -40,11 +41,10 @@ class SHist(Estimator):
         for i in range (0, len(columns)):
             if columns[i] in categorical_variables:
                 encoder = encoder_map[columns[i]]
-                #TODO: Verify encoded values. Idea: apply inverse transform to the output and then check.
                 val = []
                 val.append(values[i])
                 print(val)
-                ans = encoder.fit_transform(val)
+                ans = encoder.transform(val)
                 print(ans)
                 values[i] = ans[0]
                 val = []
@@ -60,6 +60,9 @@ class SHist(Estimator):
                 for k in range(0,len(bins)):
                     bin = bins[k]
                     if bin[0] == values[0]
+
+        return 0,10
+
 
 
         
@@ -121,7 +124,7 @@ def test_single_hist(seed: int, dataset: str, version: str, workload: str, param
 
     model_path = MODEL_ROOT / table.dataset
     model_path.mkdir(parents=True, exist_ok=True)
-    model_file = model_path / f"{table.version}-mhist_bin{params['num_bins']}.pkl"
+    model_file = model_path / f"{table.version}-shist_bin{params['num_bins']}.pkl"
 
     if model_file.is_file():
         L.info(f"{model_file} already exists, directly load and use")
