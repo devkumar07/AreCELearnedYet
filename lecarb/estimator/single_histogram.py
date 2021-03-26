@@ -28,14 +28,14 @@ class SHist(Estimator):
     #TODO: Finish logic for performing cardinality estimation
 
     def query(self, query):
-        print('in query')
+        #print('in query')
         histograms = self.bins
         categorical_variables = self.categorical_variables
         encoder_map = self.encoder_map
         columns, operators, values = query_2_triple(query, with_none=False, split_range=False)
-        print(columns)
-        print(operators)
-        print(values)
+        # print(columns)
+        # print(operators)
+        # print(values)
         est_card = []
         #Step 1: Encode categorical to numerical from query statement
         for i in range (0, len(columns)):
@@ -43,32 +43,72 @@ class SHist(Estimator):
                 encoder = encoder_map[columns[i]]
                 val = []
                 val.append(values[i])
-                print(val)
                 ans = encoder.transform(val)
-                print(ans)
                 values[i] = ans[0]
                 val = []
-        print('Encoded values:')
-        print(values)
+        # print('Encoded values:')
+        # print(values)
         
         #Iterate over all conditions
         for i in range(0, len(columns)):
             #Check for specific condition corresponding to the operator
-            if operators == '=':
-                bins = histograms[columns[i]]
+            #print(histograms)
+            bins = histograms[columns[i]]
+            #print('in loop')
+            if operators[i] == '=':
                 for k in range(0,len(bins)):
                     bin = bins[k]
                     if values[i] >= bin[0] and bin[1] >= values[i]:
+                        #print('point pred')
+                        #print(bin[3]/bin[4])
                         est_card.append(bin[3]/bin[4])
                         break
+            elif operators[i] == '<=' or operators[i] == '<':
+                #print('less than case')
+                est_card.append(self.handle_less_than_case(bins, values[i]))
             
-        return np.sum(est_card),10
+            elif operators[i] == '>=' or operators[i] == '>':
+                #print('greater than case')
+                est_card.append(self.handle_greater_than_case(bins, values[i]))
+            
+            else:
+                est_card.append(1)
+        
+        for i in range(0, len(est_card)):
+            print('before: ', est_card[i])
+            est_card[i] = est_card[i]/48850
+            print('after: ', est_card[i])
+        print(np.prod(est_card))
+            
+        return np.prod(est_card)*48850,10
 
-
-
+    def handle_less_than_case(self, bins, value):
+        counter = 0
+        for k in range(0, len(bins)):
+            bin = bins[k]
+            if value > bin[1] and value > bin[0]:
+                counter = counter + bin[3]
+            else:
+                counter = counter + (bin[3]*(value-bin[0]))/(bin[1]-bin[0]) #[start,finish,'True',freq,len(distinct_val)] 
+                break
+        #print('less than')
+        #print(counter)
+        return counter
+    
+    def handle_greater_than_case(self, bins, value):
+        counter = 0
+        for k in range(0, len(bins)):
+            bin = bins[k]
+            if value < bin[1] and value < bin[0]:
+                counter = counter + bin[3]
+            elif value < bin[1] and bin[0] < value:
+                counter = counter + bin[3]*((bin[0]-value))/(bin[1]-bin[0])
+        #print('greater than')
+        #print(counter)
+        return counter
         
 def construct_bins(table, num_bins):
-    partitions = []
+    partitions = {}
     data = table.data
     ## Converting categorical values to numerical
     encoder_map = {}
@@ -110,7 +150,8 @@ def construct_bins(table, num_bins):
             meta = [start,finish,'True',freq,len(distinct_val)] 
             print(meta)
             bins.append(meta)
-        partitions.append(bins)
+        partitions[data_sorted.columns[i]] = bins
+        #partitions.append(bins)
     
     return partitions, encoder_map, categorical_variables
 
