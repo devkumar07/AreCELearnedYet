@@ -184,10 +184,10 @@ def run_test(dataset: str, version: str, workload: str, estimator: Estimator, ov
     with open(result_file, 'w') as f:
         writer = csv.writer(f)
         writer.writerow(['id', 'error', 'predict', 'label', 'dur_ms'])
-        k = 0
+        #/qerr
         for i, data in enumerate(zip(queries, labels)):
-            if k == 1:
-                break
+            # if k == 10:
+            #     break
             query, label = data
             est_card, dur_ms = estimator.query(query)
             est_card = np.round(r * est_card)
@@ -197,8 +197,9 @@ def run_test(dataset: str, version: str, workload: str, estimator: Estimator, ov
             writer.writerow([i, error, est_card, label.cardinality, dur_ms])
             if (i+1) % 1000 == 0:
                 L.info(f"{i+1} queries finished")
-            k = k +1
+            #k = k +1
     L.info(f"Test finished, {np.mean(latencys)} ms/query in average")
+    #print(errors)
     evaluate_errors(errors)
 
 

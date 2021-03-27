@@ -59,6 +59,8 @@ class SHist(Estimator):
                 counter = 0
                 for k in range(0,len(bins)):
                     bin = bins[k]
+                    # if columns[i] == 'education':
+                    #     print(values[i])
                     if values[i] >= bin[0]:
                         if values[i] <= bin[1]:
                             counter = counter + bin[3]/bin[4]
@@ -79,7 +81,10 @@ class SHist(Estimator):
                 est_card.append(self.handle_inBetween_case(bins, values[i]))
         
         for i in range(0, len(est_card)):
+            #print('before: ', est_card[i])
             est_card[i] = est_card[i]/48850
+            #print('after: ', est_card[i])
+        #print(np.prod(est_card))
             
         return np.prod(est_card)*48850,10
 
@@ -89,15 +94,28 @@ class SHist(Estimator):
         counter = 0
         for k in range(0,len(bins)):
             bin = bins[k]
-            if bin[0] >= lower_bound:
-                if bin[1] >= upper_bound:
-                    counter = counter + (bin[3]*(upper_bound-bin[0]))/(bin[1]-bin[0])
-                    break
-                elif bin[0] != lower_bound and bin[1] != bin[0]:
+            #Case 1: bounds are all in the same bin
+            if lower_bound >= bin[0] and upper_bound <= bin[1]:
+                counter = counter + (bin[3]*(upper_bound-lower_bound))/(bin[1]-bin[0])
+                break 
+            #Case 2: one bound is in a bin, other is in another
+            else:
+                if lower_bound > bin[0] and lower_bound < bin[1]:
+                    # print('goes here')
+                    # print(bin[1])
+                    # print(lower_bound)
+                    # print(bin[0])
                     counter = counter + bin[3]*((bin[1]-lower_bound))/(bin[1]-bin[0])
+                    #print(counter)
+                elif upper_bound < bin[1] and upper_bound > bin[0]:
+                    #print('goes here1')
+                    counter = counter + (bin[3]*(upper_bound-bin[0]))/(bin[1]-bin[0])  
+                    #print(counter)
+                    break
                 else:
+                    #print('goes here2')
                     counter = counter + bin[3]
-        
+                    #print(counter)
         return counter
     def handle_less_than_case(self, bins, value):
         counter = 0
@@ -136,18 +154,18 @@ def construct_bins(table, num_bins):
             encoder = LabelEncoder()
             data[data.columns[i]] = encoder.fit_transform(data[data.columns[i]])
             encoder_map[data.columns[i]] = encoder
-    #print(encoder_map)
+    print(encoder_map)
     data_sorted = data.copy()
     for col in data_sorted:
         data_sorted[col] = data_sorted[col].sort_values(ignore_index=True)
     data_sorted_numpy = data_sorted.to_numpy()
-    #print(data_sorted_numpy)
+    print(data_sorted_numpy)
     average_freq = len(data_sorted_numpy)/num_bins
     
     #Create 1-D hist for each attribute
     for i in range(0,len(data_sorted.columns)):
         k = 1
-        #print('FOR: ',data_sorted.columns[i])
+        print('FOR: ',data_sorted.columns[i])
         #Iterate over num_bins
         bins = []
         for x in range(num_bins): 
@@ -165,7 +183,7 @@ def construct_bins(table, num_bins):
             freq = freq + 1
             distinct_val = np.unique(values)
             meta = [start,finish,'True',freq,len(distinct_val)] 
-            #print(meta)
+            print(meta)
             bins.append(meta)
         partitions[data_sorted.columns[i]] = bins
         #partitions.append(bins)
