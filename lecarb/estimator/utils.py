@@ -200,6 +200,8 @@ def run_test(dataset: str, version: str, workload: str, estimator: Estimator, ov
                 L.info(f"{i+1} queries finished")
             #k = k +1
     L.info(f"Test finished, {np.mean(latencys)} ms/query in average")
+    L.info(f"Total time, {np.sum(latencys)} ms")
+    
     #print(errors)
     evaluate_errors(errors)
 

@@ -19,12 +19,12 @@ from sklearn.preprocessing import LabelEncoder
 L = logging.getLogger(__name__)
 
 class SHist(Estimator):
-    def __init__(self, bins, num_bins, total, encoder_map, table, categorical_variables):
+    def __init__(self, state, num_bins, table):
         super(SHist, self).__init__(table=table, bins=num_bins)
-        self.bins = bins
-        self.total = total
-        self.encoder_map = encoder_map
-        self.categorical_variables = categorical_variables
+        self.bins = state['partitions']
+        self.total = state['total']
+        self.encoder_map = state['encoder']
+        self.categorical_variables = state['categorical_variables']
 
 
     def query(self, query):
@@ -50,6 +50,7 @@ class SHist(Estimator):
         # print('Encoded values:')
         # print(values)
         
+        start_stmp = time.time()
         #Iterate over all conditions
         for i in range(0, len(columns)):
             #Check for specific condition corresponding to the operator
@@ -89,8 +90,9 @@ class SHist(Estimator):
             est_card[i] = est_card[i]/total
             #print('after: ', est_card[i])
         #print(np.prod(est_card))
+        dur_ms = (time.time() - start_stmp) * 1e3
             
-        return np.prod(est_card)*total,10
+        return np.prod(est_card)*total, dur_ms
 
     def handle_inBetween_case(self, bins, value):
         lower_bound = value[0]
@@ -166,19 +168,19 @@ def construct_bins(table, num_bins):
             encoder = LabelEncoder()
             data[data.columns[i]] = encoder.fit_transform(data[data.columns[i]])
             encoder_map[data.columns[i]] = encoder
-    print(encoder_map)
+    #print(encoder_map)
     data_sorted = data.copy()
     for col in data_sorted:
         data_sorted[col] = data_sorted[col].sort_values(ignore_index=True)
     data_sorted_numpy = data_sorted.to_numpy()
-    print(data_sorted_numpy)
+    #print(data_sorted_numpy)
     average_freq = len(data_sorted_numpy)/num_bins
     total = len(data_sorted_numpy)
     
     #Create 1-D hist for each attribute
     for i in range(0,len(data_sorted.columns)):
         k = 1
-        print('FOR: ',data_sorted.columns[i])
+        #print('FOR: ',data_sorted.columns[i])
         #Iterate over num_bins
         bins = []
         for x in range(num_bins): 
@@ -196,12 +198,13 @@ def construct_bins(table, num_bins):
             freq = freq + 1
             distinct_val = np.unique(values)
             meta = [start,finish,'True',freq,len(distinct_val)] 
-            print(meta)
+            #print(meta)
             bins.append(meta)
         partitions[data_sorted.columns[i]] = bins
         #partitions.append(bins)
+        state = {'partitions':partitions, 'total': total, 'encoder': encoder_map, 'categorical_variables': categorical_variables}
     
-    return partitions, total, encoder_map, categorical_variables
+    return state
 
 def test_single_hist(seed: int, dataset: str, version: str, workload: str, params: Dict[str, Any], overwrite: bool) -> None:
     """
@@ -222,13 +225,13 @@ def test_single_hist(seed: int, dataset: str, version: str, workload: str, param
             state = pickle.load(f)
     else:
         L.info(f"Construct SHist with at most {params['num_bins']} bins...")
-        state, total, encoder, categorical_variables = construct_bins(table, params['num_bins'])
+        state = construct_bins(table, params['num_bins'])
         with open(model_file, 'wb') as f:
             pickle.dump(state, f, protocol=PKL_PROTO)
         L.info(f"MHist saved to {model_file}")
 
     # partitions = attribute_bins
-    estimator = SHist(state, params['num_bins'], total, encoder, table, categorical_variables)
+    estimator = SHist(state, params['num_bins'], table)
     L.info(f"Built SHist estimator: {estimator}")
 
     run_test(dataset, version, workload, estimator, overwrite)

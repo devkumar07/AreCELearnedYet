@@ -281,9 +281,6 @@ class MHist(Estimator):
     def query(self, query):
         #print('in query')
         columns, operators, values = query_2_triple(query, with_none=False, split_range=False)
-        print(columns)
-        print(operators)
-        print(values)
         # descritize predicate parameters for non-numerical columns
         for i, predicate in enumerate(zip(columns, operators, values)):
             cname, op, val = predicate
