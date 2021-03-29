@@ -19,19 +19,20 @@ from sklearn.preprocessing import LabelEncoder
 L = logging.getLogger(__name__)
 
 class SHist(Estimator):
-    def __init__(self, bins, encoder_map, table, categorical_variables):
-        super(SHist, self).__init__(table=table, bins=len(bins))
+    def __init__(self, bins, num_bins, total, encoder_map, table, categorical_variables):
+        super(SHist, self).__init__(table=table, bins=num_bins)
         self.bins = bins
+        self.total = total
         self.encoder_map = encoder_map
         self.categorical_variables = categorical_variables
 
-    #TODO: Finish logic for performing cardinality estimation
 
     def query(self, query):
         #print('in query')
         histograms = self.bins
         categorical_variables = self.categorical_variables
         encoder_map = self.encoder_map
+        total = self.total
         columns, operators, values = query_2_triple(query, with_none=False, split_range=False)
         # print(columns)
         # print(operators)
@@ -61,32 +62,35 @@ class SHist(Estimator):
                     bin = bins[k]
                     # if columns[i] == 'education':
                     #     print(values[i])
-                    if values[i] >= bin[0]:
-                        if values[i] <= bin[1]:
-                            counter = counter + bin[3]/bin[4]
-                        else:
-                            counter = counter + bin[3]
+                    if values[i] >= bin[0] and values[i] <= bin[1]:
+                        counter = counter + bin[3]/bin[4]
 
                 est_card.append(counter)
 
             elif operators[i] == '<=' or operators[i] == '<':
+                if operators[i] == '<=':
+                    est_card.append(self.handle_less_thanEqual_case(bins, values[i]))
                 #print('less than case')
-                est_card.append(self.handle_less_than_case(bins, values[i]))
+                else:
+                    est_card.append(self.handle_less_than_case(bins, values[i]))
             
             elif operators[i] == '>=' or operators[i] == '>':
                 #print('greater than case')
-                est_card.append(self.handle_greater_than_case(bins, values[i]))
+                if operators[i] == '>=':
+                    est_card.append(self.handle_greater_thanEqual_case(bins, values[i]))
+                else:
+                    est_card.append(self.handle_greater_than_case(bins, values[i]))
             
             else:
                 est_card.append(self.handle_inBetween_case(bins, values[i]))
         
         for i in range(0, len(est_card)):
             #print('before: ', est_card[i])
-            est_card[i] = est_card[i]/48850
+            est_card[i] = est_card[i]/total
             #print('after: ', est_card[i])
         #print(np.prod(est_card))
             
-        return np.prod(est_card)*48850,10
+        return np.prod(est_card)*total,10
 
     def handle_inBetween_case(self, bins, value):
         lower_bound = value[0]
@@ -94,49 +98,57 @@ class SHist(Estimator):
         counter = 0
         for k in range(0,len(bins)):
             bin = bins[k]
-            #Case 1: bounds are all in the same bin
-            if lower_bound >= bin[0] and upper_bound <= bin[1]:
-                counter = counter + (bin[3]*(upper_bound-lower_bound))/(bin[1]-bin[0])
-                break 
-            #Case 2: one bound is in a bin, other is in another
-            else:
-                if lower_bound > bin[0] and lower_bound < bin[1]:
-                    # print('goes here')
-                    # print(bin[1])
-                    # print(lower_bound)
-                    # print(bin[0])
-                    counter = counter + bin[3]*((bin[1]-lower_bound))/(bin[1]-bin[0])
-                    #print(counter)
-                elif upper_bound < bin[1] and upper_bound > bin[0]:
-                    #print('goes here1')
-                    counter = counter + (bin[3]*(upper_bound-bin[0]))/(bin[1]-bin[0])  
-                    #print(counter)
-                    break
-                else:
-                    #print('goes here2')
+            if bin[0] >= lower_bound:
+                if bin[1] <= upper_bound:
                     counter = counter + bin[3]
-                    #print(counter)
+                elif bin[1] > upper_bound and upper_bound > bin[0]:
+                    counter = counter + (bin[3]*(upper_bound-bin[0]))/(bin[1]-bin[0]) 
         return counter
+
     def handle_less_than_case(self, bins, value):
         counter = 0
         for k in range(0, len(bins)):
             bin = bins[k]
             if value > bin[1] and value > bin[0]:
                 counter = counter + bin[3]
-            else:
-                counter = counter + (bin[3]*(value-bin[0]))/(bin[1]-bin[0]) #[start,finish,'True',freq,len(distinct_val)] 
-                break
+            elif value > bin[0] and value < bin[1]:
+                counter = counter + (bin[3]*(value-bin[0]))/(bin[1]-bin[0]) 
         #print('less than')
         #print(counter)
         return counter
+    
+    def handle_less_thanEqual_case(self, bins, value):
+        counter = 0
+        for k in range(0, len(bins)):
+            bin = bins[k]
+            if value >= bin[1] and value >= bin[0]:
+                counter = counter + bin[3]
+            elif value >= bin[0] and value < bin[1]:
+                counter = counter + (bin[3]*(value-bin[0]))/(bin[1]-bin[0]) 
+        #print('less than')
+        #print(counter)
+        return counter
+    
     
     def handle_greater_than_case(self, bins, value):
         counter = 0
         for k in range(0, len(bins)):
             bin = bins[k]
-            if value < bin[1] and value < bin[0]:
+            if bin[1] > value and bin[0] > value:
                 counter = counter + bin[3]
-            elif value < bin[1] and bin[0] < value:
+            elif value > bin[0] and value < bin[1]:
+                counter = counter + bin[3]*((bin[1]-value))/(bin[1]-bin[0])
+        #print('greater than')
+        #print(counter)
+        return counter
+    
+    def handle_greater_thanEqual_case(self, bins, value):
+        counter = 0
+        for k in range(0, len(bins)):
+            bin = bins[k]
+            if bin[1] >= value and bin[0] >= value:
+                counter = counter + bin[3]
+            elif value <= bin[1] and bin[0] <= value:
                 counter = counter + bin[3]*((bin[1]-value))/(bin[1]-bin[0])
         #print('greater than')
         #print(counter)
@@ -161,6 +173,7 @@ def construct_bins(table, num_bins):
     data_sorted_numpy = data_sorted.to_numpy()
     print(data_sorted_numpy)
     average_freq = len(data_sorted_numpy)/num_bins
+    total = len(data_sorted_numpy)
     
     #Create 1-D hist for each attribute
     for i in range(0,len(data_sorted.columns)):
@@ -188,7 +201,7 @@ def construct_bins(table, num_bins):
         partitions[data_sorted.columns[i]] = bins
         #partitions.append(bins)
     
-    return partitions, encoder_map, categorical_variables
+    return partitions, total, encoder_map, categorical_variables
 
 def test_single_hist(seed: int, dataset: str, version: str, workload: str, params: Dict[str, Any], overwrite: bool) -> None:
     """
@@ -209,13 +222,13 @@ def test_single_hist(seed: int, dataset: str, version: str, workload: str, param
             state = pickle.load(f)
     else:
         L.info(f"Construct SHist with at most {params['num_bins']} bins...")
-        state, encoder, categorical_variables = construct_bins(table, params['num_bins'])
+        state, total, encoder, categorical_variables = construct_bins(table, params['num_bins'])
         with open(model_file, 'wb') as f:
             pickle.dump(state, f, protocol=PKL_PROTO)
         L.info(f"MHist saved to {model_file}")
 
     # partitions = attribute_bins
-    estimator = SHist(state, encoder, table, categorical_variables)
+    estimator = SHist(state, params['num_bins'], total, encoder, table, categorical_variables)
     L.info(f"Built SHist estimator: {estimator}")
 
     run_test(dataset, version, workload, estimator, overwrite)

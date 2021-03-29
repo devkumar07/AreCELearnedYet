@@ -138,6 +138,7 @@ def run_test(dataset: str, version: str, workload: str, estimator: Estimator, ov
     # prepare file path, do not proceed if result already exists
     result_path = RESULT_ROOT / f"{dataset}"
     result_path.mkdir(parents=True, exist_ok=True)
+    print(estimator)
     result_file = result_path / f"{version}-{workload}-{estimator}.csv"
     if not overwrite and result_file.is_file():
         L.info(f"Already have the result {result_file}, do not run again!")
@@ -184,9 +185,9 @@ def run_test(dataset: str, version: str, workload: str, estimator: Estimator, ov
     with open(result_file, 'w') as f:
         writer = csv.writer(f)
         writer.writerow(['id', 'error', 'predict', 'label', 'dur_ms'])
-        #/qerr
+        k = 0
         for i, data in enumerate(zip(queries, labels)):
-            # if k == 10:
+            # if k == 3:
             #     break
             query, label = data
             est_card, dur_ms = estimator.query(query)
