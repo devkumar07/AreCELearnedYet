@@ -28,7 +28,6 @@ class SHist(Estimator):
 
 
     def query(self, query):
-        #print('in query')
         histograms = self.bins
         categorical_variables = self.categorical_variables
         encoder_map = self.encoder_map
@@ -162,6 +161,7 @@ def construct_bins(table, num_bins):
     ## Converting categorical values to numerical
     encoder_map = {}
     categorical_variables = []
+    start_time = time.time()
     for i in range(0, len(data.dtypes)):
         if data.dtypes[i].name == 'category':
             categorical_variables.append(data.columns[i])
@@ -180,7 +180,7 @@ def construct_bins(table, num_bins):
     #Create 1-D hist for each attribute
     for i in range(0,len(data_sorted.columns)):
         k = 1
-        #print('FOR: ',data_sorted.columns[i])
+        print('FOR: ',data_sorted.columns[i])
         #Iterate over num_bins
         bins = []
         for x in range(num_bins): 
@@ -203,7 +203,8 @@ def construct_bins(table, num_bins):
         partitions[data_sorted.columns[i]] = bins
         #partitions.append(bins)
         state = {'partitions':partitions, 'total': total, 'encoder': encoder_map, 'categorical_variables': categorical_variables}
-    
+    dur_ms = (time.time() - start_time) * 1e3
+    L.info(f"Time taken to build: {dur_ms} ms")
     return state
 
 def test_single_hist(seed: int, dataset: str, version: str, workload: str, params: Dict[str, Any], overwrite: bool) -> None:

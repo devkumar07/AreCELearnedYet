@@ -47,6 +47,7 @@ from .dataset.manipulate_dataset import gen_appended_dataset
 from .estimator.sample import test_sample
 from .estimator.sample_reservoir import test_sample_reservoir
 from .estimator.single_histogram import test_single_hist
+from .estimator.sketches import test_sketches_hist
 from .estimator.postgres import test_postgres
 from .estimator.mysql import test_mysql
 from .estimator.mhist import test_mhist
@@ -182,6 +183,8 @@ if __name__ == "__main__":
             test_sample_reservoir(seed, dataset, version, workload, params, overwrite)
         elif args["--estimator"] == "single-histogram":
             test_single_hist(seed, dataset, version, workload, params, overwrite)
+        elif args["--estimator"] == "sketches":
+            test_sketches_hist(seed, dataset, version, workload, params, overwrite)
         elif args["--estimator"] == "postgres":
             test_postgres(seed, dataset, version, workload, params, overwrite)
         elif args["--estimator"] == "mysql":
