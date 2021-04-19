@@ -16,11 +16,13 @@ class Postgres(Estimator):
         super(Postgres, self).__init__(table=table, version=table.version, stat=stat_target, seed=seed)
 
         self.conn = psycopg2.connect(DATABASE_URL)
-        self.conn.autocommit = True
+        #self.conn.autocommit = True
         self.cursor = self.conn.cursor()
+
 
         # construct statistics
         start_stmp = time.time()
+        self.cursor.execute("SET search_path TO lecarb")
         self.cursor.execute('select setseed({});'.format(1 / seed))
         for c in table.columns.values():
             self.cursor.execute('alter table \"{}\" alter column {} set statistics {};'.format(
