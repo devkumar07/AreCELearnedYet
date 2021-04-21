@@ -206,12 +206,15 @@ def construct_bins(table, num_bins, hist_bins):
     #Step 3: sort columns
     for col in data_sorted:
         data_sorted[col] = data_sorted[col].sort_values(ignore_index=True)
-
+    
     data_sorted_numpy = data_sorted.to_numpy()
     total = len(data_sorted_numpy)
     
     original_bins = num_bins
     original_hist_bins = hist_bins
+    average_freq = int(len(data_sorted_numpy)/hist_bins)
+    start_index = 0
+    end_index = average_freq
 
     #Step 4: Construct sketch/histogram for each attribute
     for i in range(0,len(data_sorted.columns)):
@@ -222,10 +225,6 @@ def construct_bins(table, num_bins, hist_bins):
         bucket3 = [0] *  num_bins
         bucket4 = [0] *  num_bins
         bucket5 = [0] *  num_bins
-
-        average_freq = int(len(data_sorted_numpy)/hist_bins)
-
-        intervals = np.arange(average_freq, len(data_sorted_numpy) + average_freq, average_freq)
 
         if (data.columns[i] in categorical_variables or len(data[data.columns[i]].unique()) < 100):
             counts = data_sorted[data.columns[i]].value_counts().to_dict()
@@ -244,8 +243,7 @@ def construct_bins(table, num_bins, hist_bins):
             buckets = [bucket1, bucket2, bucket3, bucket4, bucket5]
             attribute_sketches[data.columns[i]] = buckets
 
-        if data.columns[i] not in categorical_variables:
-            k = 0
+        if data.columns[i] not in categorical_variables or data.columns[i] not in attribute_sketches:
             if len(data[data.columns[i]].unique()) < hist_bins:
                 hist_bins = len(data[data.columns[i]].unique())
                 counts = data_sorted[data.columns[i]].value_counts().to_dict()
@@ -254,24 +252,23 @@ def construct_bins(table, num_bins, hist_bins):
                     bins.append(meta)
             else:
                 for x in range(0,hist_bins):
-                    start = data_sorted_numpy[k][i]
-                    freq = 1
-                    values = []
-                    values.append(data_sorted_numpy[k][i])
-                    while k % int(average_freq) != 0:
-                        values.append(data_sorted_numpy[k][i])
-                        k = k + 1
-                        freq = freq + 1
-                    values.append(data_sorted_numpy[k][i])
-                    finish = data_sorted_numpy[k][i]
-                    k = k + 1
-                    freq = freq + 1
+                    values = data_sorted[data.columns[i]][start_index:end_index + 1]
+                    start = values[start_index]
+                    finish = values[end_index]
                     distinct_val = np.unique(values)
-                    meta = [start,finish,'True',freq,len(distinct_val)] 
+                    meta = meta = [start,finish,'True',average_freq,len(distinct_val)] 
                     bins.append(meta)
+                    start_index = end_index + 1
+                    end_index = end_index + average_freq
+                    values = []
+                    if(end_index > len(data_sorted_numpy)):
+                        end_index = len(data_sorted_numpy)
             partitions[data_sorted.columns[i]] = bins
         num_bins = original_bins
         hist_bins = original_hist_bins
+        start_index = 0
+        end_index = average_freq
+
     state = {'partitions':partitions, 'total': total, 'encoder': encoder_map, 'categorical_variables': categorical_variables, 'hash_functions': hash_functions, 'sketches': attribute_sketches, 'num_bins': num_bins}
     dur_ms = (time.time() - start_time) 
     L.info(f"Time taken to build: {dur_ms} s")
