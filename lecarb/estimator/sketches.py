@@ -8,6 +8,7 @@ import bisect
 from typing import Any, Dict, Tuple
 import numpy as np
 import random
+import mmh3
 
 from .estimator import Estimator
 from .utils import run_test
@@ -55,18 +56,16 @@ class Sketches_Hist(Estimator):
         start_stmp = time.time()
 
         for i in range(0, len(columns)):
-            
             sketches_buckets = []
             if columns[i] in sketches and (operators[i] == '=' or operators[i] == '[]'):
                 sketches_buckets = sketches[columns[i]]
-                num_bins = len(sketches_buckets[0])
+                #num_bins = len(sketches_buckets[0])
                 if operators[i] == '=':
-                    
-                    val1 = sketches_buckets[0][compute_hash(values[i],hash_functions['coeff'][0],hash_functions['const'][0],num_bins)]
-                    val2 = sketches_buckets[1][compute_hash(values[i],hash_functions['coeff'][1],hash_functions['const'][1],num_bins)]
-                    val3 = sketches_buckets[2][compute_hash(values[i],hash_functions['coeff'][2],hash_functions['const'][2],num_bins)]
-                    val4 = sketches_buckets[3][compute_hash(values[i],hash_functions['coeff'][3],hash_functions['const'][3],num_bins)]
-                    val5 = sketches_buckets[4][compute_hash(values[i],hash_functions['coeff'][4],hash_functions['const'][4],num_bins)]
+                    val1 = sketches_buckets[0][compute_hash(values[i],hash_functions[0],hash_functions[0],num_bins)]
+                    val2 = sketches_buckets[1][compute_hash(values[i],hash_functions[1],hash_functions[1],num_bins)]
+                    val3 = sketches_buckets[2][compute_hash(values[i],hash_functions[2],hash_functions[2],num_bins)]
+                    val4 = sketches_buckets[3][compute_hash(values[i],hash_functions[3],hash_functions[3],num_bins)]
+                    val5 = sketches_buckets[4][compute_hash(values[i],hash_functions[4],hash_functions[4],num_bins)]
                    
                     est_card.append(min(val1,val2,val3,val4,val5))
                 else:
@@ -77,7 +76,7 @@ class Sketches_Hist(Estimator):
                     for y in range(0,5):
                         val = 0
                         for x in range(minBound, maxBound+1):
-                            val = val + sketches_buckets[y][compute_hash(x,hash_functions['coeff'][y],hash_functions['const'][y],num_bins)]
+                            val = val + sketches_buckets[y][compute_hash(x,hash_functions[y],hash_functions[y],num_bins)]
                         range_sum.append(val)
     
                     est_card.append(min(range_sum))
@@ -136,8 +135,6 @@ class Sketches_Hist(Estimator):
                 counter = counter + bin[3]
             elif value > bin[0] and value < bin[1]:
                 counter = counter + (bin[3]*(value-bin[0]))/(bin[1]-bin[0]) 
-        #print('less than')
-        #print(counter)
         return counter
     
     def handle_less_thanEqual_case(self, bins, value):
@@ -148,8 +145,6 @@ class Sketches_Hist(Estimator):
                 counter = counter + bin[3]
             elif value >= bin[0] and value < bin[1]:
                 counter = counter + (bin[3]*(value-bin[0]))/(bin[1]-bin[0]) 
-        #print('less than')
-        #print(counter)
         return counter
     
     
@@ -161,8 +156,6 @@ class Sketches_Hist(Estimator):
                 counter = counter + bin[3]
             elif value > bin[0] and value < bin[1]:
                 counter = counter + bin[3]*((bin[1]-value))/(bin[1]-bin[0])
-        #print('greater than')
-        #print(counter)
         return counter
     
     def handle_greater_thanEqual_case(self, bins, value):
@@ -173,29 +166,20 @@ class Sketches_Hist(Estimator):
                 counter = counter + bin[3]
             elif value <= bin[1] and bin[0] <= value:
                 counter = counter + bin[3]*((bin[1]-value))/(bin[1]-bin[0])
-        #print('greater than')
-        #print(counter)
         return counter
 
 def generate_hash_functions():
-    coeff = []
-    const = []
+    seeds = []
     for i in range(0,5):
-        coeff.append(random.randint(-5,5))
-        const.append(random.randint(-5,5))
-    hash_functions = {'coeff': coeff, 'const': const}
+        seeds.append(random.randint(1,100000))
     
-    return hash_functions
-
-def is_prime(x):
-    return all(x % i for i in range(2, x))
-
-def next_prime(x):
-    return min([a for a in range(x+1, 2*x) if is_prime(a)])
+    return seeds
 
 def compute_hash(value, coeff, const, num_bins):
 
-    return ((coeff * value) + const) % num_bins 
+    pos = mmh3.hash(str(value),coeff) % num_bins
+    
+    return pos
 
 def construct_bins(table, num_bins, hist_bins):
     partitions = {}
@@ -206,10 +190,11 @@ def construct_bins(table, num_bins, hist_bins):
 
     #Step 1: Generate Hash functions
     hash_functions = generate_hash_functions()
+
+    #Step 2: Convert categorical to numerical
     start_time = time.time()
     for i in range(0, len(data.dtypes)):
         if data.dtypes[i].name == 'category':
-            #print(data.columns[i])
             categorical_variables.append(data.columns[i])
             encoder = LabelEncoder()
             data[data.columns[i]] = encoder.fit_transform(data[data.columns[i]])
@@ -217,22 +202,20 @@ def construct_bins(table, num_bins, hist_bins):
 
     data_sorted = data.copy()
 
+
+    #Step 3: sort columns
     for col in data_sorted:
         data_sorted[col] = data_sorted[col].sort_values(ignore_index=True)
 
     data_sorted_numpy = data_sorted.to_numpy()
     total = len(data_sorted_numpy)
     
-    #Create 1-D hist for each attribute
     original_bins = num_bins
     original_hist_bins = hist_bins
 
+    #Step 4: Construct sketch/histogram for each attribute
     for i in range(0,len(data_sorted.columns)):
-        #Iterate over num_bins
         bins = []
-
-        if len(data[data.columns[i]].unique()) < num_bins:
-            num_bins = len(data[data.columns[i]].unique())
         
         bucket1 = [0] *  num_bins
         bucket2 = [0] *  num_bins
@@ -240,47 +223,58 @@ def construct_bins(table, num_bins, hist_bins):
         bucket4 = [0] *  num_bins
         bucket5 = [0] *  num_bins
 
-        if len(data[data.columns[i]].unique()) < hist_bins:
-            hist_bins = len(data[data.columns[i]].unique())
-
         average_freq = int(len(data_sorted_numpy)/hist_bins)
 
         intervals = np.arange(average_freq, len(data_sorted_numpy) + average_freq, average_freq)
 
-        if (data.columns[i] in categorical_variables or len(data[data.columns[i]].unique()) < 100) and min(data[data.columns[i]].unique()) >= 0:
-            for x in range(0, len(data)):
-                pos1 = compute_hash(data_sorted_numpy[x][i], hash_functions['coeff'][0], hash_functions['const'][0], num_bins)
-                pos2 = compute_hash(data_sorted_numpy[x][i], hash_functions['coeff'][1], hash_functions['const'][1], num_bins)
-                pos3 = compute_hash(data_sorted_numpy[x][i], hash_functions['coeff'][2], hash_functions['const'][2], num_bins)
-                pos4 = compute_hash(data_sorted_numpy[x][i], hash_functions['coeff'][3], hash_functions['const'][3], num_bins)
-                pos5 = compute_hash(data_sorted_numpy[x][i], hash_functions['coeff'][4], hash_functions['const'][4], num_bins)
-                bucket1[pos1] = bucket1[pos1] + 1
-                bucket2[pos2] = bucket2[pos2] + 1
-                bucket3[pos3] = bucket3[pos3] + 1
-                bucket4[pos4] = bucket4[pos4] + 1
-                bucket5[pos5] = bucket5[pos5] + 1
+        if (data.columns[i] in categorical_variables or len(data[data.columns[i]].unique()) < 100):
+            counts = data_sorted[data.columns[i]].value_counts().to_dict()
+            for x in counts:
+                pos1 = compute_hash(x, hash_functions[0], hash_functions[0], num_bins)
+                pos2 = compute_hash(x, hash_functions[1], hash_functions[1], num_bins)
+                pos3 = compute_hash(x, hash_functions[2], hash_functions[2], num_bins)
+                pos4 = compute_hash(x, hash_functions[3], hash_functions[3], num_bins)
+                pos5 = compute_hash(x, hash_functions[4], hash_functions[4], num_bins)
+
+                bucket1[pos1] = bucket1[pos1] + counts[x]
+                bucket2[pos2] = bucket2[pos2] + counts[x]
+                bucket3[pos3] = bucket3[pos3] + counts[x]
+                bucket4[pos4] = bucket4[pos4] + counts[x]
+                bucket5[pos5] = bucket5[pos5] + counts[x]
             buckets = [bucket1, bucket2, bucket3, bucket4, bucket5]
             attribute_sketches[data.columns[i]] = buckets
 
         if data.columns[i] not in categorical_variables:
             k = 0
-            for x in range(0,hist_bins):
-                start = data_sorted_numpy[intervals[k]-average_freq][i]
-                freq = average_freq
-                values = []
-                values.append(data_sorted_numpy[0:average_freq+1][i])
-                finish = data_sorted_numpy[intervals[k]][i]
-                k = k + 1
-                distinct_val = np.unique(values)
-                meta = [start,finish,'True',freq,len(distinct_val)] 
-                #print(meta)
-                bins.append(meta)
+            if len(data[data.columns[i]].unique()) < hist_bins:
+                hist_bins = len(data[data.columns[i]].unique())
+                counts = data_sorted[data.columns[i]].value_counts().to_dict()
+                for key in counts:
+                    meta = [key,key,'True',counts[key],1] 
+                    bins.append(meta)
+            else:
+                for x in range(0,hist_bins):
+                    start = data_sorted_numpy[k][i]
+                    freq = 1
+                    values = []
+                    values.append(data_sorted_numpy[k][i])
+                    while k % int(average_freq) != 0:
+                        values.append(data_sorted_numpy[k][i])
+                        k = k + 1
+                        freq = freq + 1
+                    values.append(data_sorted_numpy[k][i])
+                    finish = data_sorted_numpy[k][i]
+                    k = k + 1
+                    freq = freq + 1
+                    distinct_val = np.unique(values)
+                    meta = [start,finish,'True',freq,len(distinct_val)] 
+                    bins.append(meta)
             partitions[data_sorted.columns[i]] = bins
         num_bins = original_bins
         hist_bins = original_hist_bins
     state = {'partitions':partitions, 'total': total, 'encoder': encoder_map, 'categorical_variables': categorical_variables, 'hash_functions': hash_functions, 'sketches': attribute_sketches, 'num_bins': num_bins}
-    dur_ms = (time.time() - start_time) * 1e3
-    L.info(f"Time taken to build: {dur_ms} ms")
+    dur_ms = (time.time() - start_time) 
+    L.info(f"Time taken to build: {dur_ms} s")
     return state
 
 def test_sketches_hist(seed: int, dataset: str, version: str, workload: str, params: Dict[str, Any], overwrite: bool) -> None:
